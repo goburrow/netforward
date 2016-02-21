@@ -2,16 +2,15 @@ package netforward
 
 import (
 	"crypto/tls"
-	"io"
+	"errors"
 	"log"
 	"net"
 	"time"
 )
 
-// Listener gives a listener on a local address.
-type Listener interface {
-	Accept() (net.Conn, error)
-}
+var (
+	errMustListen = errors.New("must listen first")
+)
 
 // Dialer dials to a remote address.
 type Dialer interface {
@@ -62,46 +61,50 @@ func (e *Endpoint) ListenPacket() (net.PacketConn, error) {
 	return net.ListenPacket(e.Network, e.Address)
 }
 
+type NetForwarder struct {
+	Local Endpoint
+
+	// Stream
+	ln net.Listener
+	// Packet
+	packetConn net.PacketConn
+}
+
+func (f *NetForwarder) Listen() error {
+	var err error
+	if isPacketNetwork(f.Local.Network) {
+		f.packetConn, err = f.Local.ListenPacket()
+	} else {
+		f.ln, err = f.Local.Listen()
+	}
+	return err
+}
+
+func (f *NetForwarder) Forward(remote Dialer) error {
+	if f.ln != nil {
+		return Forward(remote, f.ln)
+	}
+	if f.packetConn != nil {
+		return ForwardPacket(remote, f.packetConn)
+	}
+	return errMustListen
+}
+
+func (f *NetForwarder) Close() error {
+	if f.ln != nil {
+		return f.ln.Close()
+	}
+	if f.packetConn != nil {
+		return f.packetConn.Close()
+	}
+	return nil
+}
+
 func isPacketNetwork(network string) bool {
 	switch network {
 	case "udp", "udp4", "udp6", "ip", "ip4", "ip6", "unixgram":
 		return true
 	default:
 		return false
-	}
-}
-
-func Forward(remote Dialer, local Listener) error {
-	for {
-		conn, err := local.Accept()
-		if err != nil {
-			return err
-		}
-		go forward(remote, conn)
-	}
-}
-
-func forward(remote Dialer, conn io.ReadWriteCloser) {
-	defer conn.Close()
-
-	remoteConn, err := remote.Dial()
-	if err != nil {
-		log.Printf("dial failed: %v", err)
-		return
-	}
-	defer remoteConn.Close()
-
-	// remote -> local
-	go func() {
-		_, err := io.Copy(remoteConn, conn)
-		if err != nil {
-			log.Printf("forward failed: %v", err)
-		}
-	}()
-
-	// local -> remote
-	_, err = io.Copy(conn, remoteConn)
-	if err != nil {
-		log.Printf("forward failed: %v", err)
 	}
 }
