@@ -28,14 +28,18 @@ func forward(remote Dialer, conn io.ReadWriteCloser) {
 
 	// remote -> local
 	go func() {
-		_, err := io.Copy(remoteConn, conn)
+		buf := getBuffer()
+		defer releaseBuffer(buf)
+		_, err := io.CopyBuffer(remoteConn, conn, buf)
 		if err != nil {
 			log.Printf("forward failed: %v", err)
 		}
 	}()
 
 	// local -> remote
-	_, err = io.Copy(conn, remoteConn)
+	buf := getBuffer()
+	defer releaseBuffer(buf)
+	_, err = io.CopyBuffer(conn, remoteConn, buf)
 	if err != nil {
 		log.Printf("forward failed: %v", err)
 	}

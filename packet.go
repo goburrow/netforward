@@ -56,7 +56,8 @@ func ForwardPacket(remote Dialer, local net.PacketConn) error {
 	conns := syncConns{
 		conns: make(map[string]net.Conn),
 	}
-	buf := make([]byte, 32*1024)
+	buf := getBuffer()
+	defer releaseBuffer(buf)
 	for {
 		nr, addr, err := local.ReadFrom(buf)
 		if err != nil {
@@ -89,7 +90,11 @@ func ForwardPacket(remote Dialer, local net.PacketConn) error {
 func forwardPacket(remote net.Conn, local net.PacketConn, addr net.Addr, conns *syncConns) {
 	defer remote.Close()
 	defer conns.remove(addr)
-	_, err := io.Copy(&packetConn{local, addr}, remote)
+
+	buf := getBuffer()
+	defer releaseBuffer(buf)
+
+	_, err := io.CopyBuffer(&packetConn{local, addr}, remote, buf)
 	if err != nil {
 		log.Printf("%s: %v", addr, err)
 	}
