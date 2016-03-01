@@ -1,10 +1,10 @@
-# Network forwarding
+# Network forwarding [![GoDoc](https://godoc.org/github.com/goburrow/netforward?status.svg)](https://godoc.org/github.com/goburrow/netforward)
 
 Forward network packets between various protocols, e.g. TCP <-> UDP, TLS <-> TCP.
 
 ## Install
 ```
-go install github.com/goburrow/netforward/nf
+go get github.com/goburrow/netforward/nf
 ```
 
 ## Usage
@@ -47,7 +47,7 @@ To mitigate, run a TLS endpoint in front of the unsecure HTTP server:
 ```
 openssl req -x509 -nodes -days 365 -newkey rsa:2048 -keyout /path/to/cert.key -out /path/to/cert.crt
 
-nf -caFile /path/to/cert.crt -keyFile /path/to/cert.key -address :8443 -remote.address 127.0.0.1:8080
+nf -certFile /path/to/cert.crt -keyFile /path/to/cert.key -address :8443 -remote.address 127.0.0.1:8080
 ```
 Then only forward port 8443 in your router.
 
